@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: hubcontroller
+Version: 0.0.0
+Summary: Hub Controller v2
+Requires-Python: >=3.11

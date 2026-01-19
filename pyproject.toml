@@ -1,0 +1,30 @@
+[project]
+name = "hubcontroller"
+version = "0.0.0"
+description = "Hub Controller v2"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle (błędy)
+    "F",   # pyflakes (nieużywane importy, zmienne)
+    "I",   # isort (importy)
+]
+ignore = [
+    "E501",  # długość linii (kontrolujemy ręcznie)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*", "*_test"]
+python_classes = ["Test*"]
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
