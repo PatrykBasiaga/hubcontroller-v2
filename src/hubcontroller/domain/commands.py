@@ -1,18 +1,21 @@
-from enum import Enum
+from __future__ import annotations
+
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Mapping
 
 
-@dataclass#(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Command:
     command_id: str
     command_type: str
-    payload: dict
-     
-
-class CommmandStatus(Enum):
-    ACCEPTED = "accepted" 
+    payload: Mapping[str, Any]
 
 
-cts = Command(command_id="123", command_type="test", payload={"test": "test"})
-cts.command_idsssss = "456"
-print(cts.__dict__)
+class CommandStatus(str, Enum):
+    RECEIVED = "received"
+    ACCEPTED = "accepted"
+    EXECUTED = "executed"
+    REJECTED = "rejected"
+    TIMEOUT = "timeout"
+    FAILED = "failed"
