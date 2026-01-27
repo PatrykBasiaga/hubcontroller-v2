@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from hubcontroller.domain.commands import Command, CommandStatus
-from hubcontroller.domain.registry import CommandRegistry, TransitionResult
+from hubcontroller.domain.registry import CommandRegistry, TransitionResult, CommandRecord
 
 def make_command(command_id: str) -> Command:
     return Command(
@@ -9,30 +9,41 @@ def make_command(command_id: str) -> Command:
         payload= {'x':'s'}
         )
 
-def test_received_then_accepted():
-    registry = CommandRegistry()
-    cmd = make_command("cmd1")
-    t1 = registry.on_received(cmd)
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
-    assert t1.record.received_at is not None
-    
-    t2 = registry.on_accepted(cmd.command_id)
-    assert t2.result == TransitionResult.OK
-    assert t2.record.status == CommandStatus.ACCEPTED
-    assert t2.changed is True
-    assert t2.record.accepted_at is not None
+def given_command_is_received(registry: CommandRegistry, cmd: Command) -> CommandRecord:
+    t = registry.on_received(cmd)
+    assert t.record is not None
+    assert t.result == TransitionResult.OK
+    assert t.record.status == CommandStatus.RECEIVED
+    assert t.changed is True
+    assert t.record.received_at is not None
+    return t.record
+
+def given_command_is_accepted(registry: CommandRegistry, cmd: Command) -> CommandRecord:
+    given_command_is_received(registry, cmd)
+    t = registry.on_accepted(cmd.command_id)
+    assert t.record is not None
+    assert t.result == TransitionResult.OK
+    assert t.record.status == CommandStatus.ACCEPTED
+    assert t.changed is True
+    assert t.record.accepted_at is not None
+    return t.record
+
+def given_command_is_executed(registry: CommandRegistry, cmd: Command) -> CommandRecord:
+    given_command_is_accepted(registry, cmd)
+    t = registry.on_executed(cmd.command_id)
+    assert t.record is not None
+    assert t.result == TransitionResult.OK
+    assert t.record.status == CommandStatus.EXECUTED
+    assert t.changed is True
+    assert t.record.executed_at is not None
+    return t.record
+
 
 def test_negative_path_duplicate_on_received():
 
     registry = CommandRegistry()
     cmd = make_command("cmd1")
-
-    t1 = registry.on_received(cmd)
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
+    given_command_is_received(registry, cmd)
 
     t2 = registry.on_received(cmd)
     assert t2.result == TransitionResult.DUPLICATE
@@ -42,34 +53,12 @@ def test_negative_path_duplicate_on_received():
 def test_happy_path_received_accepted_executed():
     registry = CommandRegistry()
     cmd = make_command("cmd1")
-    t1 = registry.on_received(cmd)
-
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
-    assert t1.record.received_at is not None
-
-    t2 = registry.on_accepted(cmd.command_id)
-    assert t2.result == TransitionResult.OK
-    assert t2.record.status == CommandStatus.ACCEPTED
-    assert t2.changed is True
-    assert t2.record.accepted_at is not None
-
-    t3 = registry.on_executed(cmd.command_id)
-    assert t3.result == TransitionResult.OK
-    assert t3.record.status == CommandStatus.EXECUTED
-    assert t3.changed is True
-    assert t3.record.executed_at is not None
+    given_command_is_executed(registry, cmd)
 
 def test_invalid_order_received_then_executed():
     registry = CommandRegistry()
     cmd = make_command("cmd1")
-    t1 = registry.on_received(cmd)
-
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
-    assert t1.record.received_at is not None
+    given_command_is_received(registry, cmd)
 
     t2 = registry.on_executed(cmd.command_id)
     assert t2 is not None
@@ -81,27 +70,13 @@ def test_invalid_order_received_then_executed():
 def test_terminal_state_block_further_transitions():
     registry = CommandRegistry()
     cmd = make_command("cmd1")
-    t1 = registry.on_received(cmd)
+    given_command_is_received(registry, cmd)
+    accepted = given_command_is_accepted(registry, cmd)
+    executed = given_command_is_executed(registry, cmd)
 
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
-    assert t1.record.received_at is not None
 
-    t2 = registry.on_accepted(cmd.command_id)
-    assert t2.result == TransitionResult.OK
-    assert t2.record.status == CommandStatus.ACCEPTED
-    assert t2.changed is True
-    assert t2.record.accepted_at is not None
-
-    t3 = registry.on_executed(cmd.command_id)
-    assert t3.result == TransitionResult.OK
-    assert t3.record.status == CommandStatus.EXECUTED
-    assert t3.changed is True
-    assert t3.record.executed_at is not None
-
-    accepted_at_t3 = t3.record.accepted_at
-    executed_at_t3 = t3.record.executed_at
+    accepted_at = accepted.accepted_at
+    executed_at = executed.executed_at
 
     t4 = registry.on_accepted(cmd.command_id)
     assert t4.result == TransitionResult.TERMINAL
@@ -109,33 +84,18 @@ def test_terminal_state_block_further_transitions():
     assert t4.changed is False
     assert t4.record.accepted_at is not None
     assert t4.record.executed_at is not None
-    assert t4.record.accepted_at == accepted_at_t3
-    assert t4.record.executed_at == executed_at_t3
+    assert t4.record.accepted_at == accepted_at
+    assert t4.record.executed_at == executed_at
 
 def test_terminal_state_duplication():
     registry = CommandRegistry()
     cmd = make_command("cmd1")
-    t1 = registry.on_received(cmd)
+    given_command_is_received(registry, cmd)
+    accepted = given_command_is_accepted(registry, cmd)
+    executed = given_command_is_executed(registry, cmd)
 
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
-    assert t1.record.received_at is not None
-
-    t2 = registry.on_accepted(cmd.command_id)
-    assert t2.result == TransitionResult.OK
-    assert t2.record.status == CommandStatus.ACCEPTED
-    assert t2.changed is True
-    assert t2.record.accepted_at is not None
-
-    t3 = registry.on_executed(cmd.command_id)
-    assert t3.result == TransitionResult.OK
-    assert t3.record.status == CommandStatus.EXECUTED
-    assert t3.changed is True
-    assert t3.record.executed_at is not None
-
-    accepted_at_t3 = t3.record.accepted_at
-    executed_at_t3 = t3.record.executed_at
+    accepted_at = accepted.accepted_at
+    executed_at = executed.executed_at
 
     t4 = registry.on_executed(cmd.command_id)
     assert t4 is not None
@@ -144,8 +104,8 @@ def test_terminal_state_duplication():
     assert t4.changed is False
     assert t4.record.accepted_at is not None
     assert t4.record.executed_at is not None
-    assert t4.record.accepted_at == accepted_at_t3
-    assert t4.record.executed_at == executed_at_t3
+    assert t4.record.accepted_at == accepted_at
+    assert t4.record.executed_at == executed_at
 
 def test_unknown_command():
     registry = CommandRegistry()
@@ -160,38 +120,25 @@ def test_accept_timeout_expired():
     fake_clock = FakeClock(datetime.now(timezone.utc))
     registry = CommandRegistry(clock=fake_clock.now, accept_timeout_s=3.0)
     cmd = make_command("cmd1")
-
-    # RECEIVED
-    t1 = registry.on_received(cmd)
-    assert t1.result == TransitionResult.OK
-    assert t1.record.status == CommandStatus.RECEIVED
-    assert t1.changed is True
-    assert t1.record.received_at is not None
+    record = given_command_is_received(registry, cmd)
 
     fake_clock.advance(3.1)
     expired = registry.expire_timeouts()
     assert expired == 1
-
-    rec = registry.get_record("cmd1")
-    
-    assert rec is not None
-    assert rec.status == CommandStatus.TIMEOUT
-    assert rec.timeout_at == fake_clock.now()
+    assert record is not None
+    assert record.status == CommandStatus.TIMEOUT
+    assert record.timeout_at == fake_clock.now()
 
 def test_terminal_command_timeout():
     fake_clock = FakeClock(datetime.now(timezone.utc))
     registry = CommandRegistry(clock= fake_clock.now, exec_timeout_s=10.0)
     cmd = make_command("cmd1")
 
-    t1 = registry.on_received(cmd)
-    assert t1.record.status == CommandStatus.RECEIVED
+    given_command_is_received(registry, cmd)
+    given_command_is_accepted(registry, cmd)
+    executed = given_command_is_executed(registry, cmd)
 
-    t2 = registry.on_accepted(cmd.command_id)
-    assert t2.record.status == CommandStatus.ACCEPTED
-
-    t3 = registry.on_executed(cmd.command_id)
-    assert t3.record.status == CommandStatus.EXECUTED
-    executed_at_before_timeout = t3.record.executed_at
+    executed_at_before_timeout = executed.executed_at
 
     fake_clock.advance(11.0)
     expired = registry.expire_timeouts()
@@ -209,21 +156,18 @@ def test_ttl_command_deletion():
     registry = CommandRegistry(clock=fake_clock.now, ttl_s=10.0)
     cmd = make_command("cmd1")
 
-    t1 = registry.on_received(cmd)
-    assert t1.record is not None
-    assert t1.record.status == CommandStatus.RECEIVED
+    given_command_is_received(registry, cmd)
     rec_before_ttl = registry.get_record("cmd1")
 
     deleted_before_ttl = registry.gc_ttl()
     assert deleted_before_ttl == 0
-    registry.get_record("cmd1") == rec_before_ttl
+    assert registry.get_record("cmd1") is rec_before_ttl
     assert registry.get_record("cmd1") is not None
 
     fake_clock.advance(10.0)
     deleted = registry.gc_ttl()
     assert deleted == 1
     assert registry.get_record("cmd1") is None
-
 
 
 class FakeClock:
