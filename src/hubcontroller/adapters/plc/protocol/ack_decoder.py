@@ -6,12 +6,12 @@ from typing import Any
 class AckDecoder:
 
     def decode(self, data: bytearray) -> AckSnapshot:
-        if len(data) >= ACK_FRAME_SPEC.length:
+        if len(data) < ACK_FRAME_SPEC.length:
             raise ValueError(f"Data length mismatch: {len(data)} != {ACK_FRAME_SPEC.length}")
         values = {}
         for field in ACK_FRAME_SPEC.fields:
             index = field.offset - ACK_FRAME_SPEC.start
-            values[field.name]= self.decode_field(data, field, offset=index)
+            values[field.name]= self.decode_field(data=data, field=field, index=index)
         return AckSnapshot(**values)
 
 
@@ -44,7 +44,7 @@ class AckDecoder:
         declared_max = data[index]
         current_len = data[index+1]
         if declared_max < max_length:
-            pass
+            raise ValueError(f"Declared max length mismatch: {declared_max} < {max_length}")
         if current_len > declared_max:
             current_len = min(current_len, max_length)
         raw = data[index+2:index+2+current_len]
