@@ -1,7 +1,7 @@
 from enum import Enum
 from dataclasses import dataclass
 
-from hubcontroller.domain.hub_state import HubStateSnapshot, HubMode, ExecutionState
+from hubcontroller.domain.hub_state import HubStateSnapshot, HubMode
 from hubcontroller.domain.commands import Command
 
 class GuardDecisionReason(Enum):

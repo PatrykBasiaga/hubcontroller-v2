@@ -3,6 +3,9 @@ name = "hubcontroller"
 version = "0.0.0"
 description = "Hub Controller v2"
 requires-python = ">=3.11"
+dependencies = [
+    "python-snap7",
+]
 
 [tool.ruff]
 line-length = 100

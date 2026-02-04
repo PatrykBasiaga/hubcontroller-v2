@@ -11,13 +11,11 @@ class HubMode(str, Enum):
     HOMING_ACTIVE = "homing_active"
     HOMING_READY = "homing_ready"
 
-
 class ExecutionState(str, Enum):
     IDLE = "idle"
     EXECUTING = "executing"
     ACTION_NEEDED = "action_needed" 
     FAILED = "failed"
-
 
 @dataclass(frozen=True, slots=True)
 class HubStateSnapshot:

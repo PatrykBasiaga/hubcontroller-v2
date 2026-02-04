@@ -11,6 +11,7 @@ class CommandRecord:
     command: Command
     status: CommandStatus
     received_at: datetime
+    dispatched_at: datetime | None = None
     accepted_at: datetime | None = None
     executed_at: datetime | None = None
     rejected_at: datetime | None = None
@@ -34,9 +35,10 @@ class Transition:
     changed: bool
 
 class CommandRegistry:
-    def __init__(self, accept_timeout_s: float = 3.0, exec_timeout_s: float = 80.0, ttl_s: float = 600.0, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
+    def __init__(self, accept_timeout_s: float = 15.0, exec_timeout_s: float = 80.0, ttl_s: float = 600.0, clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc)):
         self.accept_timeout_s = accept_timeout_s  # seconds
         self.exec_timeout_s = exec_timeout_s # seconds
+        self.dispatch_timeout_s = 5.0 # seconds
         self.ttl_s = ttl_s # seconds
         self._by_command_id: dict[str, CommandRecord] = {}
         self._clock = clock
@@ -55,7 +57,21 @@ class CommandRegistry:
             self._by_command_id[cmd.command_id] = record
             return Transition(record = record, result= TransitionResult.OK, changed= True)
     
-    
+    def on_dispatched(self, command_id: str) -> Transition:
+        record = self.get_record(command_id)
+        if record is None:
+            return Transition(record=None, result=TransitionResult.UNKNOWN_COMMAND, changed=False)
+        else:
+            if record.status == CommandStatus.DISPATCHED:
+                return Transition(record=record, result=TransitionResult.DUPLICATE, changed=False)
+            elif record.is_terminal():
+                return Transition(record=record, result=TransitionResult.TERMINAL, changed=False)
+            elif record.status != CommandStatus.RECEIVED:
+                return Transition(record=record, result=TransitionResult.INVALID_STATE, changed=False)
+            else:
+                record.status = CommandStatus.DISPATCHED
+                record.dispatched_at = self.now_utc()
+                return Transition(record=record, result=TransitionResult.OK, changed=True)
 
     def on_accepted(self, command_id: str) -> Transition:
         record = self.get_record(command_id)
@@ -66,7 +82,7 @@ class CommandRegistry:
                 return Transition(record= record, result= TransitionResult.DUPLICATE, changed= False)
             elif record.is_terminal():
                 return Transition(record= record, result= TransitionResult.TERMINAL, changed= False)
-            elif record.status != CommandStatus.RECEIVED:
+            elif record.status != CommandStatus.DISPATCHED:
                 return Transition(record= record, result= TransitionResult.INVALID_STATE, changed= False)
             else:
                 record.status = CommandStatus.ACCEPTED
@@ -114,7 +130,7 @@ class CommandRegistry:
                 return Transition(record= record, result= TransitionResult.DUPLICATE, changed= False)
             elif record.is_terminal():
                 return Transition(record= record, result= TransitionResult.TERMINAL, changed= False)
-            elif record.status != CommandStatus.ACCEPTED:
+            elif record.status not in {CommandStatus.DISPATCHED, CommandStatus.ACCEPTED}:
                 return Transition(record= record, result= TransitionResult.INVALID_STATE, changed= False)
             else:
                 record.status = CommandStatus.FAILED
@@ -134,6 +150,12 @@ class CommandRegistry:
             elif record.status == CommandStatus.ACCEPTED :
                 if record.accepted_at is None: continue
                 if (now - record.accepted_at).total_seconds() >= self.exec_timeout_s:
+                    record.status = CommandStatus.TIMEOUT
+                    record.timeout_at = now
+                    expired += 1
+            elif record.status == CommandStatus.DISPATCHED:
+                if record.dispatched_at is None: continue
+                if (now - record.dispatched_at).total_seconds() >= self.dispatch_timeout_s:
                     record.status = CommandStatus.TIMEOUT
                     record.timeout_at = now
                     expired += 1
