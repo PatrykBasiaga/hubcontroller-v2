@@ -90,9 +90,9 @@ def get_max_length(fields: tuple[FieldSpec, ...], start: int = 0) -> int:
 
 ACK_FIELDS = (
     FieldSpec(name="trigger", offset=0, dtype=PlcDataType.INT),
-    FieldSpec(name="command_ack", offset=2, dtype=PlcDataType.STRING, max_len=100),
+    FieldSpec(name="command", offset=2, dtype=PlcDataType.STRING, max_len=100),
     FieldSpec(name="error", offset=104, dtype=PlcDataType.INT),
-    FieldSpec(name="error_description", offset=106, dtype=PlcDataType.STRING, max_len=100),
+    FieldSpec(name="message", offset=106, dtype=PlcDataType.STRING, max_len=100),
     FieldSpec(name="token", offset=208, dtype=PlcDataType.STRING, max_len=40),
     FieldSpec(name="mission_id", offset=250, dtype=PlcDataType.INT),
 )

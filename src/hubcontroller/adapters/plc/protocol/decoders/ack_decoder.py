@@ -1,5 +1,5 @@
-from hubcontroller.adapters.plc.protocol.ack_snapshot import AckSnapshot
-from hubcontroller.adapters.plc.ack_specs import ACK_FRAME_SPEC, PlcDataType, FieldSpec
+from hubcontroller.adapters.plc.protocol.models.ack_snapshot import AckSnapshot
+from hubcontroller.adapters.plc.protocol.specs.ack_specs import ACK_FRAME_SPEC, PlcDataType, FieldSpec
 import struct
 from typing import Any
 
