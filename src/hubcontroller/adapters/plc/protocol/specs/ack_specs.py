@@ -88,6 +88,18 @@ def get_max_length(fields: tuple[FieldSpec, ...], start: int = 0) -> int:
     if not fields: return 0
     else: return (max(field_end_offset(field) for field in fields) - start)
 
+def get_field_offset(self, name: str) -> int:
+    matches = [f for f in self.fields if f.name == name]
+    if not matches:
+        available = ", ".join(sorted(f.name for f in self.fields))
+        raise ValueError(
+            f"FrameSpec misconfigured: field '{name}' not found. "
+            f"Available fields: [{available}]"
+        )
+    if len(matches) > 1:
+        raise ValueError(f"FrameSpec misconfigured: duplicate field name '{name}'")
+    return matches[0].offset  # ABSOLUTNY offset w DB
+
 ACK_FIELDS = (
     FieldSpec(name="trigger", offset=0, dtype=PlcDataType.INT),
     FieldSpec(name="command", offset=2, dtype=PlcDataType.STRING, max_len=100),
